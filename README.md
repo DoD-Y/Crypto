@@ -39,7 +39,7 @@ Edit `web_include/config.py` with your NIST STS path.
 
 ```bash
 pip install fastapi uvicorn python-multipart
-需要在本地wsl上配置nist套件，为sts-2.1.2
+You also need the NIST STS suite (sts-2.1.2) compiled and placed in the path specified in config.py.
 ```
 
 
@@ -59,10 +59,6 @@ Copy `config.example.py` to `config.py` and set:
 - `NIST_DIR` — Path to the NIST STS directory (Linux/VPS)
 - `NIST_DIR_WIN` — Windows path via `\\wsl.localhost\...` (Windows WSL only)
 - `NIST_DIR_WSL` — Linux path inside WSL (Windows WSL only)
-
-## Deployment
-
-See [deployment guide](DEPLOY.md) for VPS setup with Nginx + HTTPS.
 
 ## Security Notes
 
