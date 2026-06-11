@@ -16,8 +16,8 @@ A web-based platform for evaluating random number generators using the NIST Stat
 │   ├── main.py            # FastAPI backend
 │   ├── config.example.py  # Configuration template
 │   ├── templates/
-│   │   └── index.html     # Frontend UI
-│   └── sts-2.1.2/         # NIST STS suite (assess + source)
+│       └── index.html     # Frontend UI
+│   
 ├── nistgen.py             # Random data generator for NIST testing
 ├── rand-C.c               # C random number generator source
 └── README.md
@@ -29,7 +29,7 @@ A web-based platform for evaluating random number generators using the NIST Stat
 
 ```bash
 git clone <your-repo-url>
-cd CryptoDZY
+cd Crypto(保存的文件夹)
 cp web_include/config.example.py web_include/config.py
 ```
 
