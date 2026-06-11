@@ -1,0 +1,2045 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CryptoTest Lab - Randomness Analysis Platform</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg-void:    #04050a;
+    --bg-deep:    #080b12;
+    --bg-panel:   #0d1018;
+    --bg-card:    #111520;
+    --bg-raised:  #161b28;
+    --border:     #1e2535;
+    --border-lit: #2a3550;
+    --cyan:       #00e5ff;
+    --cyan-dim:   #00b8cc;
+    --cyan-glow:  rgba(0,229,255,0.12);
+    --amber:      #ffb300;
+    --amber-dim:  #cc8c00;
+    --green:      #00e676;
+    --green-dim:  #009944;
+    --red:        #ff4f4f;
+    --red-dim:    #cc2222;
+    --purple:     #bb86fc;
+    --text-hi:    #e8eef8;
+    --text-mid:   #7a8ba8;
+    --text-lo:    #3a4560;
+    --mono: 'JetBrains Mono', monospace;
+    --sans: 'Syne', sans-serif;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg-void);
+    color: var(--text-hi);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ---------- SCANLINE OVERLAY ---------- */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 9999;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+  }
+
+  /* ---------- GRID BACKGROUND ---------- */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 0;
+    pointer-events: none;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+    background-size: 48px 48px;
+    mask-image: radial-gradient(ellipse 80% 80% at 50% 20%, black 40%, transparent 100%);
+  }
+
+  .app-container {
+    position: relative; z-index: 1;
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 0 24px 80px;
+  }
+
+  /* ---------- HEADER ---------- */
+  .site-header {
+    border-bottom: 1px solid var(--border);
+    padding: 20px 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(4,5,10,0.92);
+    backdrop-filter: blur(16px);
+  }
+
+  .logo {
+    display: flex; align-items: center; gap: 12px;
+  }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    border: 1.5px solid var(--cyan);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 16px var(--cyan-glow), inset 0 0 8px var(--cyan-glow);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .logo-icon::before {
+    content: '';
+    position: absolute;
+    width: 200%; height: 200%;
+    background: conic-gradient(transparent 0deg, var(--cyan) 60deg, transparent 120deg);
+    animation: spin 4s linear infinite;
+    opacity: 0.3;
+  }
+
+  .logo-icon svg { position: relative; z-index: 1; }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .logo-text {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: 18px;
+    letter-spacing: -0.5px;
+    color: var(--text-hi);
+  }
+
+  .logo-text span { color: var(--cyan); }
+
+  .header-meta {
+    display: flex; align-items: center; gap: 20px;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse-dot 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; box-shadow: 0 0 8px var(--green); }
+    50% { opacity: 0.5; box-shadow: 0 0 3px var(--green); }
+  }
+
+  .status-label { color: var(--text-mid); font-size: 11px; letter-spacing: 1px; text-transform: uppercase; }
+
+  /* ---------- HERO ---------- */
+  .hero {
+    padding: 60px 0 40px;
+    text-align: center;
+    position: relative;
+  }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border-lit);
+    background: var(--bg-card);
+    padding: 6px 16px;
+    border-radius: 999px;
+    font-size: 11px;
+    color: var(--cyan-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+
+  .hero h1 {
+    font-family: var(--sans);
+    font-weight: 800;
+    font-size: clamp(32px, 5vw, 58px);
+    line-height: 1.1;
+    letter-spacing: -2px;
+    background: linear-gradient(135deg, #e8eef8 0%, #7a8ba8 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 16px;
+  }
+
+  .hero h1 em {
+    font-style: normal;
+    background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .hero p {
+    color: var(--text-mid);
+    font-size: 14px;
+    max-width: 520px;
+    margin: 0 auto;
+    line-height: 1.8;
+  }
+
+  /* ---------- TAB SWITCHER ---------- */
+  .tab-bar {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 40px;
+    overflow-x: auto;
+    padding-bottom: 0;
+  }
+
+  .tab-btn {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-mid);
+    font-family: var(--mono);
+    font-size: 12px;
+    padding: 12px 20px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    margin-bottom: -1px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .tab-btn:hover { color: var(--text-hi); }
+
+  .tab-btn.active {
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+  }
+
+  .tab-indicator {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor;
+    opacity: 0.6;
+  }
+
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  /* ---------- UPLOAD ZONE ---------- */
+  .upload-zone {
+    border: 2px dashed var(--border-lit);
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: var(--bg-card);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%, var(--cyan-glow), transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+
+  .upload-zone:hover::before,
+  .upload-zone.drag-over::before { opacity: 1; }
+
+  .upload-zone:hover,
+  .upload-zone.drag-over {
+    border-color: var(--cyan);
+    box-shadow: 0 0 32px var(--cyan-glow);
+  }
+
+  .upload-icon {
+    width: 56px; height: 56px; margin: 0 auto 16px;
+    border: 1.5px solid var(--border-lit);
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--bg-raised);
+    transition: border-color 0.3s;
+  }
+
+  .upload-zone:hover .upload-icon { border-color: var(--cyan); }
+
+  .upload-title {
+    font-family: var(--sans);
+    font-weight: 600;
+    font-size: 16px;
+    color: var(--text-hi);
+    margin-bottom: 8px;
+  }
+
+  .upload-sub {
+    color: var(--text-mid);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  .file-name-display {
+    margin-top: 16px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-lit);
+    border-radius: 8px;
+    padding: 10px 16px;
+    font-size: 12px;
+    color: var(--cyan-dim);
+    display: none;
+    text-align: left;
+    word-break: break-all;
+  }
+
+  #file-input { display: none; }
+
+  /* ---------- CONTROLS ROW ---------- */
+  .controls-row {
+    display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; align-items: center;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 12px;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    font-weight: 500;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(255,255,255,0.08) 0%, transparent 100%);
+  }
+
+  .btn-primary {
+    background: var(--cyan);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(0,229,255,0.3);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: #33ecff;
+    box-shadow: 0 6px 28px rgba(0,229,255,0.5);
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background: var(--bg-raised);
+    color: var(--text-mid);
+    border: 1px solid var(--border-lit);
+  }
+
+  .btn-secondary:hover { color: var(--text-hi); border-color: var(--border-lit); }
+
+  .btn-amber {
+    background: var(--amber);
+    color: #000;
+    box-shadow: 0 4px 20px rgba(255,179,0,0.3);
+  }
+
+  .btn-amber:hover:not(:disabled) {
+    background: #ffc333;
+    box-shadow: 0 6px 28px rgba(255,179,0,0.5);
+    transform: translateY(-1px);
+  }
+
+  .btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none !important;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border: 2px solid rgba(0,0,0,0.3);
+    border-top-color: #000;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+    vertical-align: middle;
+    margin-right: 6px;
+  }
+
+  /* ---------- PROGRESS ---------- */
+  .progress-bar-wrap {
+    height: 3px;
+    background: var(--bg-raised);
+    border-radius: 2px;
+    overflow: hidden;
+    margin-top: 16px;
+    display: none;
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--cyan), var(--purple));
+    border-radius: 2px;
+    width: 0%;
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  .progress-bar-fill.indeterminate {
+    width: 40%;
+    animation: indeterminate 1.2s ease-in-out infinite;
+  }
+
+  @keyframes indeterminate {
+    0%   { margin-left: -40%; }
+    100% { margin-left: 100%; }
+  }
+
+  /* ---------- RESULT PANEL ---------- */
+  .result-section {
+    margin-top: 32px;
+    opacity: 0;
+    transform: translateY(16px);
+    transition: all 0.4s ease;
+    pointer-events: none;
+  }
+
+  .result-section.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  .result-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap; gap: 8px;
+  }
+
+  .result-title {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 14px;
+    color: var(--text-hi);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .badge {
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 3px 10px;
+    border-radius: 4px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+
+  .badge-success { background: rgba(0,230,118,0.15); color: var(--green); border: 1px solid rgba(0,230,118,0.3); }
+  .badge-error   { background: rgba(255,79,79,0.15);  color: var(--red);   border: 1px solid rgba(255,79,79,0.3); }
+  .badge-warn    { background: rgba(255,179,0,0.15);  color: var(--amber); border: 1px solid rgba(255,179,0,0.3); }
+  .badge-info    { background: rgba(0,229,255,0.12);  color: var(--cyan);  border: 1px solid rgba(0,229,255,0.25); }
+
+  .result-box {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px 24px;
+    overflow: auto;
+    max-height: 500px;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 12px;
+    line-height: 1.8;
+    color: var(--text-hi);
+    font-family: var(--mono);
+    position: relative;
+  }
+
+  .result-box::-webkit-scrollbar { width: 6px; }
+  .result-box::-webkit-scrollbar-track { background: var(--bg-deep); }
+  .result-box::-webkit-scrollbar-thumb { background: var(--border-lit); border-radius: 3px; }
+
+  /* ---------- METRICS GRID ---------- */
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .metric-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .metric-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: var(--accent, var(--cyan));
+    border-radius: 10px 10px 0 0;
+  }
+
+  .metric-card:hover {
+    border-color: var(--border-lit);
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3);
+  }
+
+  .metric-label {
+    font-size: 10px;
+    color: var(--text-mid);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .metric-value {
+    font-family: var(--sans);
+    font-weight: 700;
+    font-size: 26px;
+    color: var(--accent, var(--cyan));
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+
+  .metric-sub {
+    font-size: 10px;
+    color: var(--text-lo);
+  }
+
+  /* ---------- CANVAS ---------- */
+  .canvas-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 768px) {
+    .canvas-grid { grid-template-columns: 1fr; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .canvas-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px;
+  }
+
+  .canvas-title {
+    font-size: 11px;
+    color: var(--text-mid);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex; align-items: center; gap: 6px;
+  }
+
+  .canvas-title::before {
+    content: '';
+    width: 3px; height: 12px;
+    background: var(--cyan);
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  canvas {
+    width: 100%;
+    border-radius: 6px;
+    background: var(--bg-deep);
+  }
+
+  /* ---------- TEST TABLE ---------- */
+  .test-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .test-table th {
+    text-align: left;
+    padding: 10px 14px;
+    background: var(--bg-raised);
+    color: var(--text-mid);
+    font-size: 10px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .test-table td {
+    padding: 10px 14px;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono);
+  }
+
+  .test-table tr:last-child td { border-bottom: none; }
+
+  .test-table tr:hover td { background: var(--bg-raised); }
+
+  .verdict-pass { color: var(--green); }
+  .verdict-fail { color: var(--red); }
+  .verdict-warn { color: var(--amber); }
+
+  /* ---------- LOG LINE COLORS ---------- */
+  .log-pass { color: var(--green); }
+  .log-fail { color: var(--red); }
+  .log-warn { color: var(--amber); }
+  .log-info { color: var(--cyan-dim); }
+  .log-head { color: var(--cyan); font-weight: 700; }
+
+  /* ---------- SECTION DIVIDER ---------- */
+  .section-divider {
+    display: flex; align-items: center; gap: 16px;
+    margin: 40px 0 24px;
+  }
+
+  .section-divider-line { flex: 1; height: 1px; background: var(--border); }
+
+  .section-divider-label {
+    font-size: 11px;
+    color: var(--text-mid);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  /* ---------- INFO BOX ---------- */
+  .info-box {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 8px 8px 0;
+    padding: 14px 18px;
+    font-size: 12px;
+    color: var(--text-mid);
+    line-height: 1.8;
+    margin-bottom: 20px;
+  }
+
+  .info-box strong { color: var(--cyan-dim); }
+
+  /* ---------- ALGO SELECT ---------- */
+  .algo-select-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .algo-chip {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 8px;
+    color: var(--text-mid);
+    user-select: none;
+  }
+
+  .algo-chip input { display: none; }
+
+  .algo-chip.checked {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: rgba(0,229,255,0.06);
+  }
+
+  .algo-chip-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    border: 1.5px solid currentColor;
+    flex-shrink: 0;
+  }
+
+  .algo-chip.checked .algo-chip-dot {
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
+  }
+
+  /* ---------- INPUT FIELD ---------- */
+  .field-group {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-bottom: 16px;
+  }
+
+  .field-label {
+    font-size: 10px;
+    color: var(--text-mid);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  .field-input {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-lit);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-family: var(--mono);
+    font-size: 13px;
+    color: var(--text-hi);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+
+  .field-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 3px var(--cyan-glow);
+  }
+
+  .fields-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 640px) { .fields-row { grid-template-columns: 1fr; } }
+
+  /* ---------- NOTIFICATION ---------- */
+  .notification {
+    position: fixed;
+    bottom: 24px; right: 24px;
+    background: var(--bg-raised);
+    border: 1px solid var(--border-lit);
+    border-radius: 10px;
+    padding: 14px 20px;
+    font-size: 12px;
+    color: var(--text-hi);
+    max-width: 320px;
+    transform: translateY(80px);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 1000;
+    box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+  }
+
+  .notification.show {
+    transform: translateY(0);
+    opacity: 1;
+  }
+
+  /* ---------- COPY BTN ---------- */
+  .copy-btn {
+    background: var(--bg-raised);
+    border: 1px solid var(--border-lit);
+    color: var(--text-mid);
+    font-family: var(--mono);
+    font-size: 10px;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+
+  .copy-btn:hover { color: var(--text-hi); border-color: var(--cyan); }
+
+</style>
+</head>
+<body>
+
+<!-- NOTIFICATION -->
+<div class="notification" id="notif"></div>
+
+<div class="app-container">
+
+  <!-- HEADER -->
+  <header class="site-header">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+          <path d="M9 1L16 5V13L9 17L2 13V5L9 1Z" stroke="#00e5ff" stroke-width="1.2" fill="none"/>
+          <path d="M9 5L13 7V11L9 13L5 11V7L9 5Z" fill="#00e5ff" opacity="0.4"/>
+        </svg>
+      </div>
+      <span class="logo-text">Crypto<span>Test</span> Lab</span>
+    </div>
+    <div class="header-meta">
+      <div class="status-dot"></div>
+      <span class="status-label">System Online</span>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-badge">
+      <svg width="8" height="8" viewBox="0 0 8 8"><circle cx="4" cy="4" r="4" fill="#00e5ff"/></svg>
+      Randomness Analysis Platform v2.0
+    </div>
+    <h1>Statistical <em>Randomness</em> Evaluation</h1>
+    <p>NIST STS binary-sequence tests combined with Monte Carlo pi estimation and multi-dimensional statistical analysis for non-binary sequences.</p>
+  </div>
+
+  <!-- TAB BAR -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('nist', this)">
+      <span class="tab-indicator"></span> NIST STS Binary
+    </button>
+    <button class="tab-btn" onclick="switchTab('monte', this)">
+      <span class="tab-indicator"></span> Monte Carlo Pi
+    </button>
+    <button class="tab-btn" onclick="switchTab('nonbinary', this)">
+      <span class="tab-indicator"></span> Non-Binary Tests
+    </button>
+  </div>
+
+  <!-- ==================== TAB 1: NIST ==================== -->
+  <div class="tab-panel active" id="tab-nist">
+
+    <div class="info-box">
+      <strong>NIST STS 二进制序列测试</strong>：上传由 0 和 1 组成的文本文件（如由你的 <code>RandomDataGenerator</code> 生成的 <code>nist_*.txt</code>），后端将调用 WSL 中的 NIST SP 800-22 引擎执行 15 项标准统计测试。
+    </div>
+
+    <!-- Upload Zone -->
+    <div class="upload-zone" id="nist-dropzone" onclick="document.getElementById('nist-file').click()">
+      <input type="file" id="nist-file" accept=".txt,.bin">
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <path d="M11 14V4M11 4L7 8M11 4L15 8" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round"/>
+          <path d="M4 16V18H18V16" stroke="#7a8ba8" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="upload-title">Drop binary sequence file here</div>
+      <div class="upload-sub">Accepts .txt (ASCII 0/1) -- recommended: 100,000+ bits</div>
+      <div class="file-name-display" id="nist-fname"></div>
+    </div>
+
+    <!-- NIST Parameter Selection -->
+    <div class="fields-row" style="margin-bottom:20px; margin-top:20px;">
+      <div class="field-group">
+        <label class="field-label">序列数 (Bitstreams)</label>
+        <input type="number" class="field-input" id="nist-bitstreams" value="1" min="1" max="100">
+      </div>
+      <div class="field-group">
+        <label class="field-label">测试模式</label>
+        <select class="field-input" id="nist-test-select" onchange="toggleNistTestMode()">
+          <option value="1">全部测试 (All Tests)</option>
+          <option value="0">选择特定测试 (Custom)</option>
+        </select>
+      </div>
+
+    </div>
+
+    <!-- NIST Custom Test Selection -->
+    <div class="algo-select-grid" id="nist-custom-tests" style="display:none; margin-bottom:20px;">
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'1')">
+        <input type="checkbox" value="1" checked> <span class="algo-chip-dot"></span> Frequency
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'2')">
+        <input type="checkbox" value="2" checked> <span class="algo-chip-dot"></span> Block Frequency
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'3')">
+        <input type="checkbox" value="3" checked> <span class="algo-chip-dot"></span> Cumulative Sums
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'4')">
+        <input type="checkbox" value="4" checked> <span class="algo-chip-dot"></span> Runs
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'5')">
+        <input type="checkbox" value="5" checked> <span class="algo-chip-dot"></span> Longest Run
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'6')">
+        <input type="checkbox" value="6" checked> <span class="algo-chip-dot"></span> Rank
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'7')">
+        <input type="checkbox" value="7" checked> <span class="algo-chip-dot"></span> FFT
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'8')">
+        <input type="checkbox" value="8" checked> <span class="algo-chip-dot"></span> Nonperiodic Template
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'9')">
+        <input type="checkbox" value="9" checked> <span class="algo-chip-dot"></span> Overlapping Template
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'10')">
+        <input type="checkbox" value="10" checked> <span class="algo-chip-dot"></span> Universal
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'11')">
+        <input type="checkbox" value="11" checked> <span class="algo-chip-dot"></span> Approx Entropy
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'12')">
+        <input type="checkbox" value="12" checked> <span class="algo-chip-dot"></span> Random Excursions
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'13')">
+        <input type="checkbox" value="13" checked> <span class="algo-chip-dot"></span> Random Excursions V
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'14')">
+        <input type="checkbox" value="14" checked> <span class="algo-chip-dot"></span> Serial
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'15')">
+        <input type="checkbox" value="15" checked> <span class="algo-chip-dot"></span> Linear Complexity
+      </label>
+    </div>
+
+    <div class="controls-row">
+      <button class="btn btn-primary" id="nist-run-btn" onclick="runNistTest()" disabled>
+        Run NIST Tests
+      </button>
+      <button class="btn btn-secondary" onclick="clearNistResult()">Clear</button>
+    </div>
+
+    <div class="progress-bar-wrap" id="nist-progress">
+      <div class="progress-bar-fill indeterminate"></div>
+    </div>
+
+    <!-- Result -->
+    <div class="result-section" id="nist-result">
+      <div class="result-header">
+        <div class="result-title">
+          NIST Analysis Report
+          <span class="badge badge-info" id="nist-badge">RUNNING</span>
+        </div>
+        <button class="copy-btn" onclick="copyResult('nist-output')">Copy Output</button>
+      </div>
+      <div class="result-box" id="nist-output"></div>
+    </div>
+
+  </div>
+
+  <!-- ==================== TAB 2: MONTE CARLO ==================== -->
+  <div class="tab-panel" id="tab-monte">
+
+    <div class="info-box">
+      <strong>蒙特卡罗 Pi 估算</strong>：使用公式 <code>x = (rand() % 10000) / 10000</code> 将数据点映射到单位正方形，通过判断 <code>x^2 + y^2 &lt;= 1</code> 估算 Pi 值。真随机序列的估算值应接近 <code>3.14159...</code>，偏差越大说明序列分布越不均匀。
+      支持直接上传原始整数数据文件（每行一个整数）。
+    </div>
+
+    <!-- Settings -->
+    <div class="fields-row" style="margin-bottom:20px;">
+      <div class="field-group">
+        <label class="field-label">最大采样点数</label>
+        <input type="number" class="field-input" id="mc-sample-size" value="50000" min="1000" max="2000000">
+      </div>
+      <div class="field-group">
+        <label class="field-label">数值范围上限 N</label>
+        <input type="number" class="field-input" id="mc-n-range" value="10000" min="2" max="10000000">
+      </div>
+      <div class="field-group">
+        <label class="field-label">数据类型</label>
+        <select class="field-input" id="mc-data-type">
+          <option value="integer">每行一个整数</option>
+          <option value="binary">二进制 (0/1) 序列</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="upload-zone" id="mc-dropzone" onclick="document.getElementById('mc-file').click()">
+      <input type="file" id="mc-file" accept=".txt">
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <circle cx="11" cy="11" r="8" stroke="#00e5ff" stroke-width="1.3" stroke-dasharray="2 2"/>
+          <path d="M11 8V14M8 11H14" stroke="#00e5ff" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="upload-title">Drop integer sequence file here</div>
+      <div class="upload-sub">每行一个整数（如 data_*.txt）或二进制 0/1 文本</div>
+      <div class="file-name-display" id="mc-fname"></div>
+    </div>
+
+    <div class="controls-row">
+      <button class="btn btn-amber" id="mc-run-btn" onclick="runMonteCarlo()" disabled>
+        Run Monte Carlo
+      </button>
+      <button class="btn btn-secondary" onclick="clearMcResult()">Clear</button>
+    </div>
+
+    <div class="progress-bar-wrap" id="mc-progress">
+      <div class="progress-bar-fill indeterminate"></div>
+    </div>
+
+    <!-- Metrics -->
+    <div class="result-section" id="mc-result">
+      <div class="metrics-grid" id="mc-metrics"></div>
+
+      <div class="canvas-grid">
+        <div class="canvas-card">
+          <div class="canvas-title">Monte Carlo Scatter (sample 8000 pts)</div>
+          <canvas id="mc-canvas" width="600" height="400"></canvas>
+        </div>
+        <div class="canvas-card">
+          <div class="canvas-title">Pi Convergence Curve</div>
+          <canvas id="mc-conv-canvas" width="600" height="400"></canvas>
+        </div>
+      </div>
+
+      <div class="result-header">
+        <div class="result-title">
+          Detailed Log
+          <span class="badge" id="mc-badge">COMPLETE</span>
+        </div>
+        <button class="copy-btn" onclick="copyResult('mc-log')">Copy Log</button>
+      </div>
+      <div class="result-box" id="mc-log" style="max-height:260px;"></div>
+    </div>
+
+  </div>
+
+  <!-- ==================== TAB 3: NON-BINARY ==================== -->
+  <div class="tab-panel" id="tab-nonbinary">
+
+    <div class="info-box">
+      <strong>非二进制统计测试组</strong>：适用于原始整数序列（<code>data_*.txt</code>）。包含卡方均匀性、均值方差、自相关、间隔测试、游程测试、峰度偏度分析等 6 项全覆盖统计检验，可快速判断发生器的整体质量。
+    </div>
+
+    <!-- Select tests -->
+    <div class="field-group" style="margin-bottom:8px;">
+      <label class="field-label">选择测试项目</label>
+    </div>
+    <div class="algo-select-grid" id="test-selector">
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'chi')">
+        <input type="checkbox" value="chi" checked>
+        <span class="algo-chip-dot"></span> Chi-Square Uniformity
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'meanvar')">
+        <input type="checkbox" value="meanvar" checked>
+        <span class="algo-chip-dot"></span> Mean / Variance
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'autocorr')">
+        <input type="checkbox" value="autocorr" checked>
+        <span class="algo-chip-dot"></span> Autocorrelation
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'gap')">
+        <input type="checkbox" value="gap" checked>
+        <span class="algo-chip-dot"></span> Gap Test
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'runs')">
+        <input type="checkbox" value="runs" checked>
+        <span class="algo-chip-dot"></span> Runs Test (non-bin)
+      </label>
+      <label class="algo-chip checked" onclick="toggleChip(event,this,'ks')">
+        <input type="checkbox" value="ks" checked>
+        <span class="algo-chip-dot"></span> KS Uniformity
+      </label>
+    </div>
+
+    <div class="fields-row" style="margin-bottom:20px;">
+      <div class="field-group">
+        <label class="field-label">数值范围 N (0 ~ N-1)</label>
+        <input type="number" class="field-input" id="nb-n-range" value="10" min="2">
+      </div>
+      <div class="field-group">
+        <label class="field-label">最大样本量</label>
+        <input type="number" class="field-input" id="nb-sample-size" value="100000" min="100">
+      </div>
+      <div class="field-group">
+        <label class="field-label">显著性水平 alpha</label>
+        <select class="field-input" id="nb-alpha">
+          <option value="0.01">0.01 (Strict)</option>
+          <option value="0.05" selected>0.05 (Standard)</option>
+          <option value="0.10">0.10 (Loose)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="upload-zone" id="nb-dropzone" onclick="document.getElementById('nb-file').click()">
+      <input type="file" id="nb-file" accept=".txt">
+      <div class="upload-icon">
+        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+          <rect x="3" y="4" width="16" height="14" rx="2" stroke="#ffb300" stroke-width="1.3" fill="none"/>
+          <path d="M7 9H15M7 12H12" stroke="#ffb300" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div class="upload-title">Drop integer sequence file here</div>
+      <div class="upload-sub">每行一个整数（0 ~ N-1），对应 data_*.txt 格式</div>
+      <div class="file-name-display" id="nb-fname"></div>
+    </div>
+
+    <div class="controls-row">
+      <button class="btn btn-primary" id="nb-run-btn" onclick="runNonBinaryTests()" disabled>
+        Run Statistical Tests
+      </button>
+      <button class="btn btn-secondary" onclick="clearNbResult()">Clear</button>
+    </div>
+
+    <div class="progress-bar-wrap" id="nb-progress">
+      <div class="progress-bar-fill" id="nb-progress-fill"></div>
+    </div>
+
+    <!-- Results -->
+    <div class="result-section" id="nb-result">
+      <div class="metrics-grid" id="nb-metrics"></div>
+
+      <div class="canvas-grid">
+        <div class="canvas-card">
+          <div class="canvas-title">Frequency Distribution Histogram</div>
+          <canvas id="nb-hist-canvas" width="600" height="320"></canvas>
+        </div>
+        <div class="canvas-card">
+          <div class="canvas-title">Autocorrelation (Lag 1 ~ 50)</div>
+          <canvas id="nb-acf-canvas" width="600" height="320"></canvas>
+        </div>
+      </div>
+
+      <div class="result-header">
+        <div class="result-title">
+          Test Report
+          <span class="badge" id="nb-badge">COMPLETE</span>
+        </div>
+        <button class="copy-btn" onclick="copyResult('nb-report')">Copy Report</button>
+      </div>
+      <div style="overflow:auto;">
+        <table class="test-table" id="nb-table" style="display:none;">
+          <thead>
+            <tr>
+              <th>Test Name</th>
+              <th>Statistic</th>
+              <th>P-value / Threshold</th>
+              <th>Expected</th>
+              <th>Verdict</th>
+            </tr>
+          </thead>
+          <tbody id="nb-table-body"></tbody>
+        </table>
+      </div>
+      <div class="result-box" id="nb-report" style="margin-top:12px;max-height:300px;"></div>
+    </div>
+
+  </div>
+
+</div><!-- /app-container -->
+
+<script>
+/* ============================================================
+   TAB LOGIC
+============================================================ */
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  btn.classList.add('active');
+}
+
+function toggleChip(evt, label, val) {
+  if (evt) evt.preventDefault();
+  label.classList.toggle('checked');
+}
+
+/* ============================================================
+   UTILS
+============================================================ */
+function showNotif(msg, color) {
+  const n = document.getElementById('notif');
+  n.textContent = msg;
+  n.style.borderLeftColor = color || '#00e5ff';
+  n.classList.add('show');
+  setTimeout(() => n.classList.remove('show'), 3000);
+}
+
+function copyResult(id) {
+  const el = document.getElementById(id);
+  navigator.clipboard.writeText(el.innerText || el.textContent)
+    .then(() => showNotif('Copied to clipboard!', '#00e676'));
+}
+
+function showProgress(id) {
+  document.getElementById(id).style.display = 'block';
+}
+function hideProgress(id) {
+  document.getElementById(id).style.display = 'none';
+}
+
+function showResult(id) {
+  const el = document.getElementById(id);
+  el.classList.add('visible');
+}
+
+function clearEl(id) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = '';
+}
+
+function colorize(text) {
+  if (/PASS|SUCCESS|passed/.test(text)) return `<span class="log-pass">${text}</span>`;
+  if (/FAIL|ERROR|failed/.test(text)) return `<span class="log-fail">${text}</span>`;
+  if (/WARN|WARNING|caution/.test(text)) return `<span class="log-warn">${text}</span>`;
+  return text;
+}
+
+/* ============================================================
+   FILE HANDLING
+============================================================ */
+function initUpload(inputId, dropzoneId, fnameId, btnId, onLoad) {
+  const input = document.getElementById(inputId);
+  const zone  = document.getElementById(dropzoneId);
+  const fname = document.getElementById(fnameId);
+  const btn   = document.getElementById(btnId);
+
+  function handleFile(file) {
+    fname.style.display = 'block';
+    fname.textContent = file.name + '  (' + (file.size / 1024).toFixed(1) + ' KB)';
+    btn.disabled = false;
+    const reader = new FileReader();
+    reader.onload = e => onLoad(e.target.result, file);
+    reader.readAsText(file, 'utf-8');
+  }
+
+  input.addEventListener('change', e => { if (e.target.files[0]) handleFile(e.target.files[0]); });
+
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag-over');
+    if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+  });
+}
+
+// File data stores
+let nistFile = null;
+let mcFileContent = null;
+let nbFileContent = null;
+
+initUpload('nist-file', 'nist-dropzone', 'nist-fname', 'nist-run-btn', (text, file) => {
+  nistFile = file;
+});
+
+initUpload('mc-file', 'mc-dropzone', 'mc-fname', 'mc-run-btn', (text) => {
+  mcFileContent = text;
+});
+
+initUpload('nb-file', 'nb-dropzone', 'nb-fname', 'nb-run-btn', (text) => {
+  nbFileContent = text;
+});
+
+/* ============================================================
+   TAB 1: NIST
+=========================================================== */
+function toggleNistTestMode() {
+  const sel = document.getElementById('nist-test-select');
+  const grid = document.getElementById('nist-custom-tests');
+  grid.style.display = sel.value === '0' ? 'grid' : 'none';
+}
+
+// HTML 安全字符转义，防止报告里的特殊字符打乱页面布局
+function escHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function getNistSelectedTests() {
+  const chips = document.querySelectorAll('#nist-custom-tests .algo-chip.checked input');
+  return Array.from(chips).map(i => i.value);
+}
+
+async function runNistTest() {
+  if (!nistFile) {
+    alert("请先选择或生成需要测试的文件！");
+    return;
+  }
+  
+  // 🎯 1. 动态获取前端配置参数
+  const bitstreams = parseInt(document.getElementById('nist-bitstreams').value) || 1;
+  const testMode = document.getElementById('nist-test-select').value || "1";
+  
+  // 更新 UI 状态（禁用按钮、显示 Running 状态）
+  const btn = document.getElementById('nist-run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Running NIST...';
+  showProgress('nist-progress');
+  document.getElementById('nist-badge').textContent = 'RUNNING';
+  document.getElementById('nist-badge').className = 'badge badge-warn';
+  showResult('nist-result');
+  document.getElementById('nist-output').innerHTML = '<span class="log-info">// Uploading file and executing NIST in WSL...</span>';
+
+  // 🎯 2. 将数据打包进 FormData
+  const formData = new FormData();
+  formData.append('file', nistFile);
+  formData.append('bitstreams', bitstreams.toString()); // 传递测试序列数
+  formData.append('test_mode', testMode);               // 传递测试模式
+  if (testMode === '0') {
+    formData.append('selected_tests', getNistSelectedTests().join(',')); // 传递选中的测试编号
+  }
+
+  try {
+    // 🎯 3. 发送 POST 请求到 Python 后端
+    const res = await fetch('/api/test-randomness/', { 
+      method: 'POST', 
+      body: formData 
+    });
+    
+    const data = await res.json();
+
+    if (res.ok && data.status === 'success') {
+      const report = data.report || data.results || '';
+      
+      // 成功：在页面上渲染 NIST 生成的最终报告
+      document.getElementById('nist-output').innerHTML = `
+        <div class="log-success">// 评测成功完成！序列数: ${data.sequence_count} | 适用单序列长度: ${data.bit_size}</div>
+        <pre class="report-content">${escHtml(report)}</pre>
+      `;
+      
+      document.getElementById('nist-badge').textContent = 'COMPLETE';
+      document.getElementById('nist-badge').className = 'badge badge-success';
+      if (typeof showNotif === 'function') showNotif('NIST test completed!', '#00e676');
+    } else {
+      // 失败：显示后端抛出的异常信息
+      const errMsg = data.detail || data.message || 'Server error';
+      document.getElementById('nist-output').innerHTML = `<span class="log-fail">ERROR: ${escHtml(errMsg)}</span>`;
+      document.getElementById('nist-badge').textContent = 'ERROR';
+      document.getElementById('nist-badge').className = 'badge badge-error';
+    }
+  } catch (err) {
+    // 网络错误
+    document.getElementById('nist-output').innerHTML = `<span class="log-fail">NETWORK ERROR: ${escHtml(err.message)}</span>`;
+    document.getElementById('nist-badge').textContent = 'ERROR';
+    document.getElementById('nist-badge').className = 'badge badge-error';
+  } finally {
+    // 重置按钮和进度条状态
+    hideProgress('nist-progress');
+    btn.disabled = false;
+    btn.innerHTML = 'Run NIST Tests';
+  }
+}
+
+
+
+function formatNistReport(report, data) {
+  let header = `<span class="log-head">// NIST SP 800-22 Statistical Test Suite Report</span>\n`;
+  header += `<span class="log-info">// File: ${escHtml(data.filename || '')}   Bits: ${data.bit_size || ''}</span>\n\n`;
+
+  const lines = report.split('\n').map(line => {
+    const escaped = escHtml(line);
+    if (/\bPASS\b/.test(line)) return `<span class="log-pass">${escaped}</span>`;
+    if (/\bFAIL\b/.test(line)) return `<span class="log-fail">${escaped}</span>`;
+    if (/^-{3,}|^={3,}/.test(line.trim())) return `<span class="log-info">${escaped}</span>`;
+    return escaped;
+  });
+  return header + lines.join('\n');
+}
+
+function clearNistResult() {
+  document.getElementById('nist-result').classList.remove('visible');
+}
+
+function escHtml(str) {
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;');
+}
+
+/* ============================================================
+   TAB 2: MONTE CARLO PI
+============================================================ */
+function parseDataFile(text, dataType) {
+  if (dataType === 'binary') {
+    return [...text].filter(c => c === '0' || c === '1').map(Number);
+  }
+  return text.split('\n')
+    .map(l => l.trim())
+    .filter(l => l.length > 0 && /^-?\d+$/.test(l))
+    .map(Number);
+}
+
+function runMonteCarlo() {
+  if (!mcFileContent) return;
+  const btn = document.getElementById('mc-run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Computing...';
+  showProgress('mc-progress');
+
+  // Use setTimeout to allow UI to update before heavy computation
+  setTimeout(() => {
+    try {
+      const sampleSize = parseInt(document.getElementById('mc-sample-size').value) || 50000;
+      const N          = parseInt(document.getElementById('mc-n-range').value) || 10000;
+      const dataType   = document.getElementById('mc-data-type').value;
+
+      const rawData = parseDataFile(mcFileContent, dataType);
+
+      if (rawData.length < 2) {
+        showNotif('File parse error: not enough data', '#ff4f4f');
+        hideProgress('mc-progress');
+        btn.disabled = false;
+        btn.innerHTML = 'Run Monte Carlo';
+        return;
+      }
+
+      const used = Math.min(rawData.length, sampleSize * 2);
+      const data = rawData.slice(0, used);
+
+      // Monte Carlo pi
+      let inside = 0;
+      const pairs = Math.floor(data.length / 2);
+      const scatterData = [];
+      const convergence = [];
+
+      const scatterLimit = Math.min(pairs, 8000);
+      const convStep = Math.max(1, Math.floor(pairs / 400));
+
+      for (let i = 0; i < pairs; i++) {
+        let x, y;
+        if (dataType === 'binary') {
+          // For binary: group bits to make integer chunks of 14 bits
+          x = 0; y = 0;
+          for (let b = 0; b < 14 && (i * 28 + b) < data.length; b++) x = x * 2 + data[i * 28 + b];
+          for (let b = 0; b < 14 && (i * 28 + 14 + b) < data.length; b++) y = y * 2 + data[i * 28 + 14 + b];
+          x = x / 16384; y = y / 16384;
+        } else {
+          x = (data[i * 2]     % N) / N;
+          y = (data[i * 2 + 1] % N) / N;
+        }
+
+        const r2 = x * x + y * y;
+        if (r2 <= 1.0) inside++;
+
+        if (i < scatterLimit) scatterData.push({ x, y, inside: r2 <= 1.0 });
+        if (i % convStep === 0 && i > 0) {
+          convergence.push({ n: i + 1, pi: (inside / (i + 1)) * 4 });
+        }
+      }
+
+      const piEst   = (inside / pairs) * 4;
+      const piError = Math.abs(piEst - Math.PI);
+      const piErrPct = (piError / Math.PI * 100);
+      const verdict  = piErrPct < 0.5 ? 'PASS' : piErrPct < 2.0 ? 'WARN' : 'FAIL';
+
+      // Additional stats
+      const mean   = data.reduce((a,b) => a + b, 0) / data.length;
+      const expMean = (N - 1) / 2;
+      const variance = data.reduce((a,b) => a + (b - mean) ** 2, 0) / data.length;
+      const stddev = Math.sqrt(variance);
+
+      // Render metrics
+      document.getElementById('mc-metrics').innerHTML = `
+        <div class="metric-card" style="--accent:${piErrPct < 0.5 ? 'var(--green)' : piErrPct < 2 ? 'var(--amber)' : 'var(--red)'}">
+          <div class="metric-label">Estimated Pi</div>
+          <div class="metric-value">${piEst.toFixed(6)}</div>
+          <div class="metric-sub">True: 3.14159265...  |  ${verdict}</div>
+        </div>
+        <div class="metric-card" style="--accent:var(--amber)">
+          <div class="metric-label">Absolute Error</div>
+          <div class="metric-value">${piError.toFixed(6)}</div>
+          <div class="metric-sub">Relative: ${piErrPct.toFixed(4)}%</div>
+        </div>
+        <div class="metric-card" style="--accent:var(--cyan)">
+          <div class="metric-label">Points Used</div>
+          <div class="metric-value">${pairs.toLocaleString()}</div>
+          <div class="metric-sub">Inside circle: ${inside.toLocaleString()}</div>
+        </div>
+        <div class="metric-card" style="--accent:var(--purple)">
+          <div class="metric-label">Sample Mean</div>
+          <div class="metric-value">${mean.toFixed(2)}</div>
+          <div class="metric-sub">Expected: ${expMean.toFixed(2)}  |  StdDev: ${stddev.toFixed(2)}</div>
+        </div>
+      `;
+
+      showResult('mc-result');
+      drawMcScatter(scatterData);
+      drawConvergence(convergence, piEst);
+
+      const badgeEl = document.getElementById('mc-badge');
+      badgeEl.textContent = verdict;
+      badgeEl.className = 'badge ' + (verdict === 'PASS' ? 'badge-success' : verdict === 'WARN' ? 'badge-warn' : 'badge-error');
+
+      // Log
+      const log = document.getElementById('mc-log');
+      log.innerHTML = [
+        `<span class="log-head">// Monte Carlo Pi Estimation - Complete</span>`,
+        `<span class="log-info">// Algorithm: x = (data[i] % ${N}) / ${N}</span>`,
+        ``,
+        `<span class="log-info">Data points loaded  : ${rawData.length.toLocaleString()}</span>`,
+        `<span class="log-info">Coordinate pairs    : ${pairs.toLocaleString()}</span>`,
+        `<span class="log-info">Inside unit circle  : ${inside.toLocaleString()}</span>`,
+        `<span class="log-info">Outside circle      : ${(pairs - inside).toLocaleString()}</span>`,
+        ``,
+        `<span class="log-info">Pi estimate         : ${piEst}</span>`,
+        `<span class="log-info">True Pi             : ${Math.PI}</span>`,
+        `<span class="${piErrPct < 0.5 ? 'log-pass' : piErrPct < 2 ? 'log-warn' : 'log-fail'}">Error               : ${piError.toFixed(8)}  (${piErrPct.toFixed(4)}%)</span>`,
+        ``,
+        `<span class="log-info">Mean                : ${mean.toFixed(4)}  (Expected: ${expMean.toFixed(4)})</span>`,
+        `<span class="log-info">Std Deviation       : ${stddev.toFixed(4)}</span>`,
+        ``,
+        `<span class="${verdict === 'PASS' ? 'log-pass' : verdict === 'WARN' ? 'log-warn' : 'log-fail'}">Verdict : ${verdict}  ${verdict === 'PASS' ? '-- Excellent randomness (error < 0.5%)' : verdict === 'WARN' ? '-- Acceptable (error 0.5% ~ 2%)' : '-- Poor randomness (error > 2%)'}</span>`
+      ].join('\n');
+
+      showNotif(`Pi estimated: ${piEst.toFixed(5)} (error ${piErrPct.toFixed(3)}%)`,
+                piErrPct < 0.5 ? '#00e676' : piErrPct < 2 ? '#ffb300' : '#ff4f4f');
+
+    } catch (err) {
+      showNotif('Error: ' + err.message, '#ff4f4f');
+      console.error(err);
+    }
+
+    hideProgress('mc-progress');
+    btn.disabled = false;
+    btn.innerHTML = 'Run Monte Carlo';
+  }, 80);
+}
+
+function drawMcScatter(pts) {
+  const canvas = document.getElementById('mc-canvas');
+  const W = canvas.offsetWidth * window.devicePixelRatio || 600;
+  const H = Math.round(W * 0.66);
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const pad = 20;
+  const size = Math.min(W, H) - pad * 2;
+
+  ctx.fillStyle = '#080b12';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid
+  ctx.strokeStyle = 'rgba(30,37,53,0.8)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const x = pad + (size / 4) * i;
+    const y = pad + (size / 4) * i;
+    ctx.beginPath(); ctx.moveTo(x, pad); ctx.lineTo(x, pad + size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(pad, y); ctx.lineTo(pad + size, y); ctx.stroke();
+  }
+
+  // Circle boundary
+  ctx.beginPath();
+  ctx.arc(pad, pad + size, size, 0, Math.PI / 2);
+  ctx.strokeStyle = 'rgba(0,229,255,0.5)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Points
+  for (const p of pts) {
+    const px = pad + p.x * size;
+    const py = pad + p.y * size;
+    ctx.beginPath();
+    ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+    ctx.fillStyle = p.inside ? 'rgba(0,230,118,0.7)' : 'rgba(255,79,79,0.55)';
+    ctx.fill();
+  }
+
+  // Labels
+  ctx.fillStyle = 'rgba(122,139,168,0.8)';
+  ctx.font = `${11 * window.devicePixelRatio}px JetBrains Mono`;
+  ctx.fillText('(0,0)', pad + 2, pad + size - 4);
+  ctx.fillText('(1,1)', pad + size - 28, pad + 12);
+}
+
+function drawConvergence(conv, finalPi) {
+  const canvas = document.getElementById('mc-conv-canvas');
+  const W = canvas.offsetWidth * window.devicePixelRatio || 600;
+  const H = Math.round(W * 0.66);
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const pad = { t: 20, r: 20, b: 30, l: 50 };
+  const w = W - pad.l - pad.r;
+  const h = H - pad.t - pad.b;
+
+  ctx.fillStyle = '#080b12';
+  ctx.fillRect(0, 0, W, H);
+
+  if (!conv.length) return;
+
+  const piTrue = Math.PI;
+  const piVals = conv.map(c => c.pi);
+  const minPi = Math.min(...piVals, piTrue - 0.3);
+  const maxPi = Math.max(...piVals, piTrue + 0.3);
+  const range = maxPi - minPi;
+
+  const scaleX = i => pad.l + (i / conv.length) * w;
+  const scaleY = v => pad.t + h - ((v - minPi) / range) * h;
+
+  // Grid
+  ctx.strokeStyle = 'rgba(30,37,53,0.8)'; ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = pad.t + (h / 4) * i;
+    ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(pad.l + w, y); ctx.stroke();
+    ctx.fillStyle = 'rgba(122,139,168,0.5)';
+    ctx.font = `${9 * window.devicePixelRatio}px JetBrains Mono`;
+    ctx.fillText((maxPi - (range / 4) * i).toFixed(3), 2, y + 3);
+  }
+
+  // True pi line
+  const trueY = scaleY(piTrue);
+  ctx.beginPath();
+  ctx.setLineDash([4 * window.devicePixelRatio, 4 * window.devicePixelRatio]);
+  ctx.moveTo(pad.l, trueY); ctx.lineTo(pad.l + w, trueY);
+  ctx.strokeStyle = 'rgba(0,229,255,0.4)'; ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Convergence path
+  ctx.beginPath();
+  conv.forEach((pt, i) => {
+    const px = scaleX(i);
+    const py = scaleY(pt.pi);
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  });
+  ctx.strokeStyle = '#ffb300'; ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // Final point
+  const lastPt = conv[conv.length - 1];
+  if (lastPt) {
+    ctx.beginPath();
+    ctx.arc(scaleX(conv.length - 1), scaleY(lastPt.pi), 4 * window.devicePixelRatio, 0, Math.PI * 2);
+    ctx.fillStyle = '#ffb300'; ctx.fill();
+  }
+}
+
+function clearMcResult() {
+  document.getElementById('mc-result').classList.remove('visible');
+  mcFileContent = null;
+  document.getElementById('mc-fname').style.display = 'none';
+  document.getElementById('mc-run-btn').disabled = true;
+}
+
+/* ============================================================
+   TAB 3: NON-BINARY STATISTICAL TESTS
+============================================================ */
+function getEnabledTests() {
+  return [...document.querySelectorAll('#test-selector .algo-chip.checked input')]
+    .map(i => i.value);
+}
+
+function jStat_chiCDF(x, df) {
+  // Regularized incomplete gamma approximation
+  if (x <= 0) return 0;
+  return 1 - gammaIncQ(df / 2, x / 2);
+}
+
+function gammaIncQ(a, x) {
+  // Upper incomplete gamma via series expansion (simple approx)
+  if (x < a + 1) {
+    let sum = 1 / a, term = 1 / a;
+    for (let n = 1; n <= 200; n++) {
+      term *= x / (a + n);
+      sum += term;
+      if (Math.abs(term) < 1e-10) break;
+    }
+    return 1 - sum * Math.exp(-x + a * Math.log(x) - logGamma(a));
+  }
+  // Continued fraction
+  let b = x + 1 - a, c = 1e30, d = 1 / b, h = d;
+  for (let i = 1; i <= 200; i++) {
+    const an = -i * (i - a);
+    b += 2;
+    d = an * d + b; if (Math.abs(d) < 1e-30) d = 1e-30;
+    c = b + an / c; if (Math.abs(c) < 1e-30) c = 1e-30;
+    d = 1 / d;
+    const del = d * c;
+    h *= del;
+    if (Math.abs(del - 1) < 1e-10) break;
+  }
+  return Math.exp(-x + a * Math.log(x) - logGamma(a)) * h;
+}
+
+function logGamma(z) {
+  const c = [76.18009172947146,-86.50532032941677,24.01409824083091,-1.231739572450155,
+             0.001208650973866179,-0.000005395239384953];
+  let y = z, x = z, tmp = x + 5.5;
+  tmp -= (x + 0.5) * Math.log(tmp);
+  let ser = 1.000000000190015;
+  for (let j = 0; j < c.length; j++) ser += c[j] / ++y;
+  return -tmp + Math.log(2.5066282746310005 * ser / x);
+}
+
+function normalCDF(z) {
+  const p = 0.2316419, b = [0.319381530,-0.356563782,1.781477937,-1.821255978,1.330274429];
+  const x = Math.abs(z), t = 1 / (1 + p * x);
+  const poly = t*(b[0]+t*(b[1]+t*(b[2]+t*(b[3]+t*b[4]))));
+  const cdf = 1 - (1/Math.sqrt(2*Math.PI))*Math.exp(-0.5*x*x)*poly;
+  return z < 0 ? 1 - cdf : cdf;
+}
+
+function runNonBinaryTests() {
+  if (!nbFileContent) return;
+  const btn = document.getElementById('nb-run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Analyzing...';
+  showProgress('nb-progress');
+  document.getElementById('nb-progress-fill').style.width = '0%';
+
+  setTimeout(() => {
+    try {
+      const N       = parseInt(document.getElementById('nb-n-range').value) || 10;
+      const maxN    = parseInt(document.getElementById('nb-sample-size').value) || 100000;
+      const alpha   = parseFloat(document.getElementById('nb-alpha').value) || 0.05;
+      const enabled = getEnabledTests();
+
+      const lines = nbFileContent.split('\n').map(l => l.trim()).filter(l => /^-?\d+$/.test(l));
+      const data  = lines.slice(0, maxN).map(Number);
+      const n     = data.length;
+
+      if (n < 100) {
+        showNotif('Not enough data (need >= 100)', '#ff4f4f');
+        hideProgress('nb-progress');
+        btn.disabled = false;
+        btn.innerHTML = 'Run Statistical Tests';
+        return;
+      }
+
+      const results = [];
+      const metrics = [];
+
+      // -- helper: update progress
+      let step = 0;
+      const steps = enabled.length;
+      function stepProg() {
+        step++;
+        document.getElementById('nb-progress-fill').style.width = `${Math.round(step/steps*100)}%`;
+      }
+
+      // ---- 1. Chi-Square Uniformity ----
+      if (enabled.includes('chi')) {
+        const freq = new Array(N).fill(0);
+        for (const v of data) { const b = Math.floor(v); if (b >= 0 && b < N) freq[b]++; }
+        const expected = n / N;
+        const chi2 = freq.reduce((s, f) => s + (f - expected) ** 2 / expected, 0);
+        const df = N - 1;
+        const pval = 1 - jStat_chiCDF(chi2, df);
+        const pass = pval > alpha;
+
+        results.push({
+          name: 'Chi-Square Uniformity',
+          stat: `chi2 = ${chi2.toFixed(3)}  df = ${df}`,
+          pval: `p = ${pval.toFixed(6)}`,
+          expected: `p > ${alpha}`,
+          pass
+        });
+
+        metrics.push({
+          label: 'Chi-Square',
+          value: chi2.toFixed(1),
+          sub: `df=${df}  p=${pval.toFixed(4)}`,
+          accent: pass ? 'var(--green)' : 'var(--red)'
+        });
+
+        drawHistogram(data, N);
+        stepProg();
+      }
+
+      // ---- 2. Mean & Variance ----
+      if (enabled.includes('meanvar')) {
+        const mean = data.reduce((a,b) => a + b, 0) / n;
+        const expMean = (N - 1) / 2;
+        const variance = data.reduce((a,b) => a + (b - mean) ** 2, 0) / (n - 1);
+        const expVar  = (N * N - 1) / 12;
+        const meanZ   = (mean - expMean) / Math.sqrt(expVar / n);
+        const meanP   = 2 * (1 - normalCDF(Math.abs(meanZ)));
+        const skew    = data.reduce((a,b) => a + ((b-mean)/Math.sqrt(variance))**3, 0) / n;
+        const kurt    = data.reduce((a,b) => a + ((b-mean)/Math.sqrt(variance))**4, 0) / n - 3;
+        const pass    = meanP > alpha;
+
+        results.push({
+          name: 'Mean Test',
+          stat: `mean = ${mean.toFixed(4)}`,
+          pval: `Z = ${meanZ.toFixed(3)}  p = ${meanP.toFixed(6)}`,
+          expected: `${expMean.toFixed(2)} +/- sigma`,
+          pass
+        });
+        results.push({
+          name: 'Variance Check',
+          stat: `var = ${variance.toFixed(2)}`,
+          pval: `Expected var = ${expVar.toFixed(2)}`,
+          expected: `ratio ${(variance/expVar).toFixed(3)} ~ 1.0`,
+          pass: Math.abs(variance - expVar) / expVar < 0.05
+        });
+
+        metrics.push({
+          label: 'Mean',
+          value: mean.toFixed(2),
+          sub: `Expected: ${expMean.toFixed(2)}  |  p=${meanP.toFixed(4)}`,
+          accent: pass ? 'var(--cyan)' : 'var(--amber)'
+        });
+        metrics.push({
+          label: 'Skewness',
+          value: skew.toFixed(3),
+          sub: `Expected ~0  |  Kurtosis: ${kurt.toFixed(3)}`,
+          accent: Math.abs(skew) < 0.1 ? 'var(--green)' : 'var(--amber)'
+        });
+        stepProg();
+      }
+
+      // ---- 3. Autocorrelation ----
+      if (enabled.includes('autocorr')) {
+        const mean = data.reduce((a,b) => a + b, 0) / n;
+        const variance = data.reduce((a,b) => a + (b - mean) ** 2, 0) / n;
+        const acfVals = [];
+        for (let lag = 1; lag <= 50; lag++) {
+          let cov = 0;
+          for (let i = 0; i < n - lag; i++) cov += (data[i] - mean) * (data[i + lag] - mean);
+          acfVals.push(cov / ((n - lag) * variance));
+        }
+        const maxAcf = Math.max(...acfVals.map(Math.abs));
+        const threshold = 1.96 / Math.sqrt(n); // 95% CI
+        const pass = maxAcf < threshold * 2;
+
+        results.push({
+          name: 'Autocorrelation (Lag 1~50)',
+          stat: `max |ACF| = ${maxAcf.toFixed(6)}`,
+          pval: `95% CI threshold = +/-${threshold.toFixed(6)}`,
+          expected: 'All lags near zero',
+          pass
+        });
+
+        drawAcf(acfVals, threshold);
+        stepProg();
+      }
+
+      // ---- 4. Gap Test ----
+      if (enabled.includes('gap')) {
+        const target = Math.floor(N / 2);
+        const gaps = [];
+        let gapLen = 0;
+        for (const v of data) {
+          if (v === target) { gaps.push(gapLen); gapLen = 0; } else gapLen++;
+        }
+        const expGap = N - 1; // expected mean gap
+        const meanGap = gaps.length > 0 ? gaps.reduce((a,b) => a+b,0) / gaps.length : 0;
+        const pass = Math.abs(meanGap - expGap) / expGap < 0.1;
+
+        results.push({
+          name: `Gap Test (target=${target})`,
+          stat: `mean gap = ${meanGap.toFixed(2)}`,
+          pval: `${gaps.length} gaps observed`,
+          expected: `exp gap = ${expGap}`,
+          pass
+        });
+        stepProg();
+      }
+
+      // ---- 5. Runs Test (non-binary) ----
+      if (enabled.includes('runs')) {
+        const mean = data.reduce((a,b) => a + b, 0) / n;
+        let runs = 1;
+        for (let i = 1; i < n; i++) {
+          if ((data[i] >= mean) !== (data[i-1] >= mean)) runs++;
+        }
+        const nAbove = data.filter(v => v >= mean).length;
+        const nBelow = n - nAbove;
+        const expRuns  = (2 * nAbove * nBelow / n) + 1;
+        const stdRuns  = Math.sqrt((2 * nAbove * nBelow * (2 * nAbove * nBelow - n)) / (n * n * (n - 1)));
+        const Z = Math.abs((runs - expRuns) / (stdRuns || 1));
+        const p = 2 * (1 - normalCDF(Z));
+        const pass = p > alpha;
+
+        results.push({
+          name: 'Runs Test (above/below mean)',
+          stat: `runs = ${runs}  Z = ${Z.toFixed(4)}`,
+          pval: `p = ${p.toFixed(6)}`,
+          expected: `exp = ${expRuns.toFixed(1)} +/- ${stdRuns.toFixed(1)}`,
+          pass
+        });
+        stepProg();
+      }
+
+      // ---- 6. KS Uniformity Test ----
+      if (enabled.includes('ks')) {
+        const sorted = [...data].sort((a,b) => a-b);
+        let ks = 0;
+        for (let i = 0; i < n; i++) {
+          const empirical = (i + 1) / n;
+          const theoretical = (sorted[i] + 1) / N;
+          ks = Math.max(ks, Math.abs(empirical - theoretical));
+        }
+        const ksThresh = 1.36 / Math.sqrt(n); // alpha=0.05
+        const pass = ks < ksThresh;
+
+        results.push({
+          name: 'Kolmogorov-Smirnov Uniformity',
+          stat: `D = ${ks.toFixed(6)}`,
+          pval: `Critical (alpha=0.05): ${ksThresh.toFixed(6)}`,
+          expected: 'D < critical value',
+          pass
+        });
+        stepProg();
+      }
+
+      // ---- Render table ----
+      const tbody = document.getElementById('nb-table-body');
+      tbody.innerHTML = results.map(r => `
+        <tr>
+          <td style="color:var(--text-hi)">${escHtml(r.name)}</td>
+          <td style="color:var(--cyan-dim)">${escHtml(r.stat)}</td>
+          <td style="color:var(--text-mid)">${escHtml(r.pval)}</td>
+          <td style="color:var(--text-lo)">${escHtml(r.expected)}</td>
+          <td class="${r.pass ? 'verdict-pass' : 'verdict-fail'}">${r.pass ? 'PASS' : 'FAIL'}</td>
+        </tr>
+      `).join('');
+      document.getElementById('nb-table').style.display = 'table';
+
+      // ---- Render metrics ----
+      document.getElementById('nb-metrics').innerHTML = metrics.map(m => `
+        <div class="metric-card" style="--accent:${m.accent}">
+          <div class="metric-label">${escHtml(m.label)}</div>
+          <div class="metric-value">${escHtml(m.value)}</div>
+          <div class="metric-sub">${escHtml(m.sub)}</div>
+        </div>
+      `).join('');
+
+      // ---- Text report ----
+      const passed = results.filter(r => r.pass).length;
+      const total  = results.length;
+      const allPass = passed === total;
+      const badge = document.getElementById('nb-badge');
+      badge.textContent = `${passed}/${total} PASSED`;
+      badge.className = 'badge ' + (allPass ? 'badge-success' : passed >= total/2 ? 'badge-warn' : 'badge-error');
+
+      document.getElementById('nb-report').innerHTML = [
+        `<span class="log-head">// Non-Binary Statistical Test Report</span>`,
+        `<span class="log-info">// N=${N}  Samples=${n.toLocaleString()}  Alpha=${alpha}</span>`,
+        ``,
+        ...results.map(r =>
+          `<span class="${r.pass ? 'log-pass' : 'log-fail'}">[${r.pass ? 'PASS' : 'FAIL'}] ${r.name}</span>\n` +
+          `<span class="log-info">       ${r.stat}  |  ${r.pval}</span>`
+        ),
+        ``,
+        `<span class="${allPass ? 'log-pass' : 'log-warn'}">Summary: ${passed}/${total} tests passed  ${allPass ? '-- Excellent uniformity' : `-- ${total-passed} test(s) failed`}</span>`
+      ].join('\n');
+
+      showResult('nb-result');
+      showNotif(`${passed}/${total} tests passed`, allPass ? '#00e676' : '#ffb300');
+
+    } catch (err) {
+      showNotif('Error: ' + err.message, '#ff4f4f');
+      console.error(err);
+    }
+
+    hideProgress('nb-progress');
+    btn.disabled = false;
+    btn.innerHTML = 'Run Statistical Tests';
+  }, 80);
+}
+
+function drawHistogram(data, N) {
+  const canvas = document.getElementById('nb-hist-canvas');
+  const W = canvas.offsetWidth * window.devicePixelRatio || 600;
+  const H = Math.round(W * 0.53);
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const pad = { t: 16, r: 16, b: 30, l: 40 };
+  const w = W - pad.l - pad.r;
+  const h = H - pad.t - pad.b;
+
+  ctx.fillStyle = '#080b12'; ctx.fillRect(0, 0, W, H);
+
+  const freq = new Array(N).fill(0);
+  for (const v of data) { const b = Math.floor(v); if (b >= 0 && b < N) freq[b]++; }
+  const maxFreq = Math.max(...freq);
+  const expected = data.length / N;
+  const barW = w / N;
+
+  // Expected line
+  const expY = pad.t + h - (expected / maxFreq) * h;
+  ctx.beginPath();
+  ctx.setLineDash([3, 3]);
+  ctx.moveTo(pad.l, expY); ctx.lineTo(pad.l + w, expY);
+  ctx.strokeStyle = 'rgba(0,229,255,0.5)'; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Bars
+  for (let i = 0; i < N; i++) {
+    const barH = (freq[i] / maxFreq) * h;
+    const x = pad.l + i * barW;
+    const y = pad.t + h - barH;
+    const dev = Math.abs(freq[i] - expected) / expected;
+    const r = Math.floor(dev > 0.1 ? 255 : dev * 2550);
+    const g = Math.floor(dev > 0.1 ? 79 : 230 - dev * 1500);
+    ctx.fillStyle = `rgba(${r},${g},118,0.8)`;
+    ctx.fillRect(x + 1, y, barW - 2, barH);
+  }
+
+  // Axes
+  ctx.strokeStyle = 'rgba(30,37,53,0.9)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t); ctx.lineTo(pad.l, pad.t + h); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t + h); ctx.lineTo(pad.l + w, pad.t + h); ctx.stroke();
+
+  ctx.fillStyle = 'rgba(122,139,168,0.7)';
+  ctx.font = `${9 * window.devicePixelRatio}px JetBrains Mono`;
+  ctx.fillText('0', pad.l - 14, pad.t + h + 12);
+  ctx.fillText(String(N - 1), pad.l + w - 12, pad.t + h + 12);
+}
+
+function drawAcf(acfVals, threshold) {
+  const canvas = document.getElementById('nb-acf-canvas');
+  const W = canvas.offsetWidth * window.devicePixelRatio || 600;
+  const H = Math.round(W * 0.53);
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  const pad = { t: 16, r: 16, b: 30, l: 44 };
+  const w = W - pad.l - pad.r;
+  const h = H - pad.t - pad.b;
+
+  ctx.fillStyle = '#080b12'; ctx.fillRect(0, 0, W, H);
+
+  const barW = w / acfVals.length;
+  const midY = pad.t + h / 2;
+
+  // CI bands
+  const ciH = (threshold / 1.0) * (h / 2);
+  ctx.fillStyle = 'rgba(0,229,255,0.04)';
+  ctx.fillRect(pad.l, midY - ciH, w, ciH * 2);
+  ctx.setLineDash([2, 4]);
+  ctx.strokeStyle = 'rgba(0,229,255,0.3)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, midY - ciH); ctx.lineTo(pad.l + w, midY - ciH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(pad.l, midY + ciH); ctx.lineTo(pad.l + w, midY + ciH); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Zero line
+  ctx.strokeStyle = 'rgba(30,37,53,0.9)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(pad.l, midY); ctx.lineTo(pad.l + w, midY); ctx.stroke();
+
+  // ACF bars
+  for (let i = 0; i < acfVals.length; i++) {
+    const val = acfVals[i];
+    const barH = Math.abs(val) / 1.0 * (h / 2);
+    const x = pad.l + i * barW;
+    const outside = Math.abs(val) > threshold;
+    ctx.fillStyle = outside ? 'rgba(255,79,79,0.8)' : 'rgba(0,230,118,0.7)';
+    if (val >= 0) ctx.fillRect(x + 1, midY - barH, barW - 2, barH);
+    else          ctx.fillRect(x + 1, midY, barW - 2, barH);
+  }
+
+  // Axis labels
+  ctx.fillStyle = 'rgba(122,139,168,0.7)';
+  ctx.font = `${9 * window.devicePixelRatio}px JetBrains Mono`;
+  ctx.fillText('Lag 1', pad.l, pad.t + h + 12);
+  ctx.fillText('Lag 50', pad.l + w - 30, pad.t + h + 12);
+  ctx.fillText('1.0', 2, pad.t + 6);
+  ctx.fillText('-1.0', 0, pad.t + h);
+}
+
+function clearNbResult() {
+  document.getElementById('nb-result').classList.remove('visible');
+  document.getElementById('nb-table').style.display = 'none';
+  nbFileContent = null;
+  document.getElementById('nb-fname').style.display = 'none';
+  document.getElementById('nb-run-btn').disabled = true;
+}
+
+/* ============================================================
+   INIT: resize canvases on load
+============================================================ */
+window.addEventListener('load', () => {
+  // Pre-size canvases so they're not 0px initially
+  ['mc-canvas','mc-conv-canvas','nb-hist-canvas','nb-acf-canvas'].forEach(id => {
+    const c = document.getElementById(id);
+    c.style.width = '100%';
+    c.style.display = 'block';
+  });
+});
+</script>
+</body>
+</html>

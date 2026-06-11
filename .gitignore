@@ -1,0 +1,18 @@
+# 本地配置（包含个人路径，禁止上传）
+web_include/config.py
+
+# NIST STS 套件（太大，部署时自行编译）
+web_include/sts-2.1.2/
+
+# Python 缓存
+__pycache__/
+*.pyc
+*.pyo
+
+# NIST 运行产物
+experiments/
+
+# 临时/测试文件
+server_*.txt
+test_*
+*.log
