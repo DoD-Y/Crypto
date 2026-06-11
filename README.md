@@ -39,7 +39,9 @@ Edit `web_include/config.py` with your NIST STS path.
 
 ```bash
 pip install fastapi uvicorn python-multipart
+需要在本地wsl上配置nist套件，为sts-2.1.2
 ```
+
 
 ### 3. Run the server
 
