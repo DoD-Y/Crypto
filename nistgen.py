@@ -8,12 +8,12 @@ class RandomDataGenerator:
 
     @staticmethod
     def uniform_distribution(n, size=10000):
-        """均匀分布随机数（理论标准）"""
+        """均匀分布随机数"""
         return [int(random.random() * n) for _ in range(size)]
 
     @staticmethod
     def normal_distribution(n, size=10000):
-        """正态分布随机数（截断正态，拒绝采样）"""
+        """正态分布随机数"""
         mu = n / 2
         sigma = n / 6
         nums = []
@@ -42,7 +42,7 @@ class RandomDataGenerator:
 
     @staticmethod
     def mersenne_twister(n, size=10000):
-        """Mersenne Twister 算法（使用numpy）"""
+        """Mersenne Twister 算法"""
         return list(np.random.randint(0, n, size))
 
     @staticmethod
@@ -55,12 +55,10 @@ class RandomDataGenerator:
     def binary_random(size=10000):
         """
         生成原始二进制随机数 (0/1)
-        使用 os.urandom() 作为熵源，质量优于 random.randint
         """
         import secrets
         return [secrets.randbits(1) for _ in range(size)]
 
-    # 🎯 核心逻辑：用真实的二进制位展开算法替代原来的中位数二值化
     @staticmethod
     def convert_to_binary(data, n):
         """
@@ -127,8 +125,8 @@ class RandomDataGenerator:
 if __name__ == "__main__":
 
     # ---- 参数配置区 ----
-    N           = 16       # 原始数值范围 0 ~ N-1
-    SAMPLE_SIZE = 1000000   # NIST 测试所需的精确比特数
+    N           = 16       # 原始数值范围 0 ~ N-1(可修改)
+    SAMPLE_SIZE = 1000000   # NIST 测试所需的精确比特数(可修改)
     OUTPUT_DIR  = "Cryptotest"  # 输出目录
     # --------------------
 
