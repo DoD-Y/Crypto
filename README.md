@@ -21,6 +21,10 @@ A web-based platform for evaluating random number generators using the NIST Stat
 ├── nistgen.py             # Random data generator for NIST testing
 ├── rand-C.c               # C random number generator source
 └── README.md
+|——cEnist.py
+|——fretest.py
+|——index.html                #用于生成网页链接
+|__mc_pi_gen.py
 ```
 
 ## Quick Start
