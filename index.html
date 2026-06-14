@@ -1845,7 +1845,7 @@ function runNonBinaryTests() {
         stepProg();
       }
 
-      // ---- 6. KS Uniformity Test ----
+     // ---- 6. KS Uniformity Test ----
       if (enabled.includes('ks')) {
         const sorted = [...data].sort((a,b) => a-b);
         let ks = 0;
@@ -1854,13 +1854,16 @@ function runNonBinaryTests() {
           const theoretical = (sorted[i] + 1) / N;
           ks = Math.max(ks, Math.abs(empirical - theoretical));
         }
-        const ksThresh = 1.36 / Math.sqrt(n); // alpha=0.05
+        // 根据显著性水平 alpha 计算临界值
+        const ksCriticalMap = {0.10: 1.22, 0.05: 1.36, 0.01: 1.63};
+        const c = ksCriticalMap[alpha] || 1.36;
+        const ksThresh = c / Math.sqrt(n);
         const pass = ks < ksThresh;
 
         results.push({
           name: 'Kolmogorov-Smirnov Uniformity',
           stat: `D = ${ks.toFixed(6)}`,
-          pval: `Critical (alpha=0.05): ${ksThresh.toFixed(6)}`,
+          pval: `Critical (α=${alpha}): ${ksThresh.toFixed(6)}`,
           expected: 'D < critical value',
           pass
         });
