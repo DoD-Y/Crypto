@@ -1,0 +1,87 @@
+import math
+import os
+
+def convert_to_nist(input_file, output_file, N, bits_needed=1000000):
+    """
+    将C语言rand()生成的整数数据转换为NIST STS测试所需的二进制格式
+    
+    参数:
+        input_file: C程序生成的原始数据文件路径
+        output_file: 输出的NIST二进制文件路径
+        N: 数值范围（0 到 N-1）
+        bits_needed: NIST测试所需的比特数（默认1,000,000）
+    """
+    
+    # 计算每个整数需要的比特宽度
+    bit_width = math.ceil(math.log2(N))
+    
+    print(f"转换参数:")
+    print(f"  数值范围: 0 ~ {N-1}")
+    print(f"  每数占比特: {bit_width} bits")
+    print(f"  所需比特数: {bits_needed:,}")
+    print("-" * 50)
+    
+    # 读取原始整数数据
+    data = []
+    with open(input_file, 'r') as f:
+        for line in f:
+            line = line.strip()
+            if line and line.lstrip('-').isdigit():
+                val = int(line)
+                if 0 <= val < N:
+                    data.append(val)
+                # 达到所需整数数量后停止读取
+                if len(data) >= math.ceil(bits_needed / bit_width):
+                    break
+    
+    print(f"读取到 {len(data):,} 个有效整数")
+    
+    # 转换为二进制位序列
+    bits = []
+    for val in data:
+        # 按位展开（高位在前）
+        for b in range(bit_width - 1, -1, -1):
+            bits.append((val >> b) & 1)
+    
+    # 截取或补齐到精确长度
+    if len(bits) < bits_needed:
+        print(f"比特数不足 ({len(bits):,} < {bits_needed:,})，正在补齐...")
+        import secrets
+        padding = [secrets.randbits(1) for _ in range(bits_needed - len(bits))]
+        bits.extend(padding)
+    else:
+        bits = bits[:bits_needed]
+    
+    # 写入NIST格式文件（单行，无换行符）
+    bit_string = ''.join(str(b) for b in bits)
+    with open(output_file, 'w', newline='') as f:
+        f.write(bit_string)
+    
+    # 验证
+    file_size = os.path.getsize(output_file)
+    ones = bit_string.count('1')
+    zeros = bits_needed - ones
+    
+    print(f"✅ 已保存: {output_file}")
+    print(f"   文件大小: {file_size:,} 字节 ({file_size*8:,} bits)")
+    print(f"   0的数量: {zeros:,} ({zeros/bits_needed*100:.2f}%)")
+    print(f"   1的数量: {ones:,} ({ones/bits_needed*100:.2f}%)")
+
+
+# ============================================================
+# 使用示例
+# ============================================================
+if __name__ == "__main__":
+    
+    # 配置参数（与您的C程序保持一致）
+    N = 32                    # 数值范围 0-31
+    BITS_NEEDED = 10000000     # NIST测试所需比特数
+    
+    # 输入输出文件路径
+    input_file = "Cryptotest/data_c_rand_mod2000000.txt"
+    output_file = "Cryptotest/nist_c_rand.txt"
+    
+    # 执行转换
+    convert_to_nist(input_file, output_file, N, BITS_NEEDED)
+    
+    print("\n✅ 转换完成！现在可以在NIST STS中测试该文件")
